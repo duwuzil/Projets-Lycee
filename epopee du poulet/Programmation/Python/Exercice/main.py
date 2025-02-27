@@ -1,46 +1,17 @@
-#!/usr/bin/env python3
 import serial
 import time
 
-def send_data(comport, baudrate):
-    ser = serial.Serial(comport, baudrate, timeout=0.1)  # Ouvre le port série
-    ip = "192.168.1.9"  # Exemple d'IP
-    mac = "00:1A:2B:3C:4D:5E"  # Exemple de MAC
-    code = "302"  # Exemple de code
-    method = "POST"
-    file = "/dossier/fichier.php?=login:admin&password:admin"
+# Configure la communication série avec l'Arduino (changez 'COM3' selon votre configuration)
+ser = serial.Serial('/dev/ttyACM0', 9600)  # Ou '/dev/ttyUSB0' sur Linux/Mac
+time.sleep(2)  # Attendre que la connexion soit établie
 
-    # Crée une chaîne avec IP, MAC et code séparés par des sauts de ligne
-    myip = f"{ip}"
-    mymac = f"{mac}"
-    mycode = f"{code}"
-    mymethod = f"{method}"
-    myfile = f"{file}"
+# Envoie d'un message
+ser.write("<want drugs, 10,0.2,0>".encode("utf-8"))  # Envoie d'une chaîne à l'Arduino
+time.sleep(1)  # Attendre un peu pour s'assurer que l'Arduino ait le temps de répondre
 
-    print(f"Envoi des données : {myip} {mymac} {mycode} {mymethod} {myfile}")  # Affiche les données envoyées pour vérification
+# Lire la réponse de l'Arduino
+while ser.in_waiting > 0:
+    response = ser.readline().decode('utf-8').strip()
+    print("Réponse de l'Arduino:", response)
 
-    # Envoi des données à l'Arduino
-    ser.write(myip.encode('utf-8'))
-    time.sleep(0.2)
-    ser.write(mymac.encode('utf-8'))
-    time.sleep(0.2)
-    ser.write(mycode.encode('utf-8'))
-    time.sleep(0.2)
-    ser.write(mymethod.encode('utf-8'))
-    time.sleep(0.2)
-    ser.write(myfile.encode('utf-8'))
-    time.sleep(0.2)
-    # Attends que l'Arduino réponde
-    time.sleep(1)
-
-    # Lecture des données reçues de l'Arduino (si nécessaire)
-    data_received = ser.readline().decode().strip()
-    if data_received:
-        print(f"Données reçues : {data_received}")
-
-
-
-    ser.close()
-
-if __name__ == '__main__':
-    send_data('/dev/ttyACM1', 9600)
+ser.close()  # Ferme la communication série
