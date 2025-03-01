@@ -15,21 +15,18 @@ const char *monthName[12] = {
 
 tmElements_t tm;
 eeprom_93C46 e = eeprom_93C46(pCS, pSK, pDI, pDO);
+
 bool longMode = EEPROM_93C46_MODE_8BIT;
 bool parse = false;
 bool config = false;
 
 void setup() {
-
-
-
-
   e.set_mode(longMode);
   Serial.begin(9600);
 
   writertc();
 
-  Serial.println("Writing data...");
+  Serial.println("resetting data...");
   e.ew_enable();
   e.erase_all();
   //PARTIE 1 ECRITURE
@@ -64,6 +61,9 @@ void setup() {
 }
 
 void loop() {
+
+
+
   if (RTC.read(tm)) {  //PARTIE 1 ECRITURE
     e.ew_enable();
     e.erase_all();
@@ -71,7 +71,7 @@ void loop() {
     if (longMode) {
       writeBuffer = "abcde\0";
     } else {
-      writeBuffer = "date:" + String(tm.Hour) + "H" + String(tm.Minute) + "m" + String(tm.Second) + "s";
+      writeBuffer = "date:" + String(tm.Hour) + "H" + String(tm.Minute) + "m" + String(tm.Second) + "s\0";
     }
 
     int len = longMode ? 64 : 128;

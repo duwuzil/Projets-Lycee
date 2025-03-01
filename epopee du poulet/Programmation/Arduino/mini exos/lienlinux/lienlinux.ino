@@ -1,6 +1,6 @@
 // Example 5 - Receive with start- and end-markers combined with parsing
 
-const byte numChars = 32;
+const byte numChars = 1024;
 char receivedChars[numChars];
 char tempChars[numChars];        // temporary array for use when parsing
 
