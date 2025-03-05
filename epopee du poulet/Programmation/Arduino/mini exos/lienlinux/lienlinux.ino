@@ -1,12 +1,12 @@
 // Example 5 - Receive with start- and end-markers combined with parsing
 
-const byte numChars = 1024;
+const byte numChars = 64;
 char receivedChars[numChars];
 char tempChars[numChars];  // temporary array for use when parsing
 
 
 // variables to hold the parsed data
-char messageFromPC[numChars] = { 0 };
+char messageFromPC[numChars] = { };
 int integerFromPC = 0;
 float floatFromPC = 0.0;
 int rwop = 0;
