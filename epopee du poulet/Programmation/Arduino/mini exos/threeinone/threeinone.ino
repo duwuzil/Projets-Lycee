@@ -11,7 +11,7 @@
 const byte numChars = 32;
 char receivedChars[numChars];
 char tempChars[numChars];
-char messageFromPC[numChars] = { 0 };
+char messageFromPC[numChars] = {  };
 int integerFromPC = 0;
 float floatFromPC = 0.0;
 int rwop = 0;
@@ -84,7 +84,7 @@ void loop() {
     }
     delay(9000);
   }
-  delay(1000);
+  
 
   recvWithStartEndMarkers();
   if (newData == true) {
@@ -96,10 +96,10 @@ void loop() {
     newData = false;
   }
   if (rwop == 1) {
-    Serial.println(String(messageFromPC));
+    showParsedData();
   }
 
-  delay(100);
+  
 }
 
 void recvWithStartEndMarkers() {
@@ -161,12 +161,7 @@ void parseData() {  // split the data into its parts
 //============
 
 void showParsedData() {
-  Serial.print("Message ");
-  Serial.println(messageFromPC);
-  Serial.print("Integer ");
-  Serial.println(integerFromPC);
-  Serial.print("Float ");
-  Serial.println(floatFromPC);
+  Serial.print("<uwu, 10, 0.1>\n");
 }
 
 
