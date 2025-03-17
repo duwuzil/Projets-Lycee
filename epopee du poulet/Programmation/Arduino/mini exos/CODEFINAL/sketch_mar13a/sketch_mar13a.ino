@@ -1,37 +1,131 @@
 #include <TimeLib.h>
 #include <DS1307RTC.h>
+#include <93C46.h>
 
 const byte numChars = 32;
 char receivedChars[numChars];
 char tempChars[numChars];
-char messageFromPC[numChars] = {  };
+char method[10] = {};
+byte ip[4] = { 0, 0, 0, 0 };
+byte minu = 0;
+byte heu = 0;
+char newmethod[10] = {};
+char invertmethod[10] = {};
+byte newip[4] = { 0, 0, 0, 0 };
+byte newminu = 0;
+byte newheu = 0;
+int code = 0;
 boolean newData = false;
 
 tmElements_t tm;
 
+#define pCS 7
+#define pSK 9
+#define pDI 10
+#define pDO 11
+
+bool longMode = EEPROM_93C46_MODE_8BIT;
+int add = 0;
+int newadd = 0;
+eeprom_93C46 e = eeprom_93C46(pCS, pSK, pDI, pDO);
+
+
 void setup() {
-  // put your setup code here, to run once:
+  e.set_mode(longMode);
   Serial.begin(9600);
-  Serial.print("bijour");
-  
+
+  Serial.println("programme final en lancement");
+  delay(200);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
   if (RTC.read(tm)) {
-    int heure = print2digits(tm.Hour);
-    int minute = print2digits(tm.Minute);
-    int seconde = print2digits(tm.Second);
-    Serial.println(String(heure) + "H" + String(minute) + "m" + String(seconde) + "s");
+    minu = tm.Minute;
+    heu = tm.Hour;
   }
   recvWithStartEndMarkers();
   if (newData == true) {
     strcpy(tempChars, receivedChars);
-    // this temporary copy is necessary to protect the original data
-    //   because strtok() used in parseData() replaces the commas with \0
     parseData();
-    showParsedData();
     newData = false;
+  }
+
+  if (code == 1) {
+    showParsedData();
+    e.ew_enable();
+
+
+    e.write(add, ip[0]);
+    add += sizeof(ip[0]);
+    e.write(add, ip[1]);
+    add += sizeof(ip[1]);
+    e.write(add, ip[2]);
+    add += sizeof(ip[2]);
+    e.write(add, ip[3]);
+    add += sizeof(ip[3]);
+    for (int i = 0; i < String(method).length(); i++) {
+      e.write(add + i, method[i]);
+    }
+    add += String(method).length();
+
+    e.write(add, heu);
+    add += sizeof(heu);
+
+    e.write(add, minu);
+    add += sizeof(minu);
+
+    e.write(add, "\0");
+
+    Serial.println(add);
+    newadd = add;
+
+    // Optionally, disable EW after writing
+    e.ew_disable();
+
+    delay(100);
+    code = 0;
+  }
+  if (code == 2) {
+    newadd -= 1;
+
+    newminu = e.read(newadd);
+    newadd -= sizeof(newminu);
+
+    newheu = e.read(newadd);
+    newadd -= sizeof(newheu);
+
+
+    for (int i = String(method).length() - 1; i >= 0; i--) {
+      newmethod[i] = e.read(newadd);   // Lire chaque caractère
+      newadd -= sizeof(newmethod[i]);  // Décrémenter l'adresse après chaque lecture
+    }
+
+
+
+
+    newip[3] = e.read(newadd);
+    newadd -= sizeof(newip[3]);
+    newip[2] = e.read(newadd);
+    newadd -= sizeof(newip[2]);
+    newip[1] = e.read(newadd);
+    newadd -= sizeof(newip[1]);
+    newip[0] = e.read(newadd);
+    newadd -= sizeof(newip[0]);
+
+    Serial.println(newip[0]);
+    Serial.println(newip[1]);
+    Serial.println(newip[2]);
+    Serial.println(newip[3]);
+    Serial.println(newmethod);
+    Serial.println(newheu);
+    Serial.println(newminu);
+    code = 0;
+  }
+  if (code == 3) {
+    add = 0;
+    resetep();
+    delay(100);
+    code = 0;
   }
 }
 
@@ -41,7 +135,6 @@ void recvWithStartEndMarkers() {
   char startMarker = '<';
   char endMarker = '>';
   char rc;
-
 
   while (Serial.available() > 0 && newData == false) {
     rc = Serial.read();
@@ -54,7 +147,7 @@ void recvWithStartEndMarkers() {
           ndx = numChars - 1;
         }
       } else {
-        receivedChars[ndx] = '\0';  // terminate the string
+        receivedChars[ndx] = '\0';
         recvInProgress = false;
         ndx = 0;
         newData = true;
@@ -67,26 +160,29 @@ void recvWithStartEndMarkers() {
   }
 }
 
+void parseData() {
+  char* strtokIndx;
+  strtokIndx = strtok(tempChars, ",");
+  strcpy(method, strtokIndx);
 
-void parseData() {  // split the data into its parts
-
-  char* strtokIndx;  // this is used by strtok() as an index
-
-  strtokIndx = strtok(tempChars, ",");  // get the first part - the string
-  strcpy(messageFromPC, strtokIndx);    // copy it to messageFromPC
-
-}
-
-
-int print2digits(int number) {
-  if (number >= 0 && number < 10) {
-    Serial.write('0');
+  strtokIndx = strtok(NULL, ",");
+  for (int i = 0; i < 4; i++) {
+    ip[i] = atoi(strtokIndx);
+    strtokIndx = strtok(NULL, ",");
   }
-  return number;
+
+  code = atoi(strtokIndx);
 }
 
-//============
+void resetep() {
+  e.ew_enable();
+  e.write_all(0x00);
+  e.ew_disable();
+}
 
 void showParsedData() {
-  Serial.print(messageFromPC);
+  Serial.print(method);
+  for (int i = 0; i < 4; i++) {
+    Serial.println(ip[i]);
+  }
 }
