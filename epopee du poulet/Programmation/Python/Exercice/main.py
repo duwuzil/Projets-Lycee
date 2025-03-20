@@ -1,19 +1,12 @@
 import serial
 import re
 import time
-import tkinter as tk
-from ctypes import windll
-windll.shcore.SetProcessDpiAwareness(1)
 
-win = tk.Tk()
-win.title("Arduino GUI")
-win.geometry("400x200")     
-message = tk.Label(win, text="Hello, World!")
-message.pack()
-win.mainloop()
+
+
 
 # Configurez le port série (remplacez 'COM7' par le port utilisé, ou '/dev/ttyUSB0' sous Linux)
-ser = serial.Serial('COM7', 9600, timeout=1)
+ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
 
 def read_message(timeout=3):
     """Lit un message complet envoyé par l'Arduino avec un timeout."""
@@ -25,7 +18,7 @@ def read_message(timeout=3):
             if re.match(pattern, message):  # Vérifie si le message correspond au format attendu
                 return message
             else:
-                print(f"Message ignoré (format incorrect)")
+                print(f"Message ignoré - si option 2, log peut être indisponible")
         if time.time() - start_time > timeout:  # Vérifie si le timeout est dépassé
             raise TimeoutError("Aucun message reçu dans le délai imparti.")
 
@@ -36,8 +29,8 @@ while True:
         if userinput == 1:
             # Saisie des informations pour écrire un log
             aipinput = int(input("1: Entrez votre IP (premier nombre, par ex 172) : "))
-            bipinput = int(input("2: Entrez votre IP (second nombre, par ex 168) : "))
-            cipinput = int(input("3: Entrez votre IP (troisième nombre, par ex 1) : "))
+            bipinput = int(input("2: Entrez votre IP (second nombre, par ex 16) : "))
+            cipinput = int(input("3: Entrez votre IP (troisième nombre, par ex 100) : "))
             dipinput = int(input("4: Entrez votre IP (quatrième nombre, par ex 1) : "))
             methodinput = input("5: Entrez la méthode : ")
             

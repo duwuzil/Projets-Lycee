@@ -1,28 +1,25 @@
-import tkinter as tk
-from tkinter import Menu
+from tkinter import *
+import serial
+import re
+import time
 
-# root window
-root = tk.Tk()
-root.title('Menu Demo')
+win = Tk()
+win.geometry("500x500")
+win.title('Data Logs')
+win["bg"] = "black"
+win.resizable(height=True,width=True)
 
-# create a menubar
-menubar = Menu(root)
-root.config(menu=menubar)
+Titre = Label(win,text="Choose your options")
+Titre.pack()
 
-# create a menu
-file_menu = Menu(menubar)
-
-# add a menu item to the menu
-file_menu.add_command(
-    label='Exit', 
-    command=root.destroy
-)
+Sec = Label(win,text="And goes out",font=("Verdana",29,"bold italic"),fg="white",bg="black")
+Sec.place(x='0',y='250')
 
 
-# add the File menu to the menubar
-menubar.add_cascade(
-    label="File",
-    menu=file_menu
-)
+butt = Button(win,text="va tfer foutre")
+butt.pack()
 
-root.mainloop()
+var = StringVar()
+inp = Entry(win,textvariable=var)
+inp.pack()
+win.mainloop()

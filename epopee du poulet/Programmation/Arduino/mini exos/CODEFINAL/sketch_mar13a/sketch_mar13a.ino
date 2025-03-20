@@ -84,7 +84,7 @@ void loop() {
 
   if (code == 2) { // Lecture de l'enregistrement le plus récent
     if (iter <= 0) {
-      Serial.println("Aucun enregistrement disponible");
+      Serial.println("<Aucun enregistrement disponible>");
       code = 0;
       return;
     }
@@ -95,7 +95,7 @@ void loop() {
 
   if (code == 4) { // Lecture d'un enregistrement spécifique
     if (recordToRead < 0 || recordToRead >= iter) {
-      Serial.println("Enregistrement non disponible");
+      Serial.println("<Enregistrement non disponible>");
       code = 0;
       return;
     }
@@ -111,7 +111,7 @@ void loop() {
       alladd[i] = 0;
     }
     resetep();
-    Serial.println("Logs effacés");
+    Serial.println("<Logs effacés>");
     code = 0;
   }
 }
