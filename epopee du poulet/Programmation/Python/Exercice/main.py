@@ -1,87 +1,80 @@
 import serial
+import re
 import time
+import tkinter as tk
+from ctypes import windll
+windll.shcore.SetProcessDpiAwareness(1)
 
-# Variables pour contenir les données analysées
-receivedChars = ""
-tempChars = ""  # Utilisé temporairement pour l'analyse
+win = tk.Tk()
+win.title("Arduino GUI")
+win.geometry("400x200")     
+message = tk.Label(win, text="Hello, World!")
+message.pack()
+win.mainloop()
 
-messageFromPC = ""
-integerFromPC = 0
-floatFromPC = 0.0
+# Configurez le port série (remplacez 'COM7' par le port utilisé, ou '/dev/ttyUSB0' sous Linux)
+ser = serial.Serial('COM7', 9600, timeout=1)
 
-newData = False
-
-# Configuration de la communication série
-ser = serial.Serial('/dev/ttyACM1', 9600)  # Changez selon votre configuration
-time.sleep(2)  # Attendez un peu pour que la connexion série soit établie
-print("Connexion série établie")
-
-# Fonction pour recevoir les données avec des marqueurs de début et de fin
-def recvWithStartEndMarkers():
-    global receivedChars, newData
-
-    startMarker = '<'
-    endMarker = '>'
-
-    recvInProgress = False
-    ndx = 0
-
-    while ser.in_waiting > 0 and not newData:
-        rc = ser.read().decode('utf-8')  # Lire un octet et le convertir en chaîne
-        # print(f"Caractère reçu : {rc}")  # Affiche chaque caractère reçu (pour le débogage)
-
-        if recvInProgress:
-            if rc != endMarker:
-                receivedChars += rc  # Ajouter le caractère reçu à receivedChars
-                ndx += 1
-                if ndx >= 64:  # Limiter à la taille max
-                    ndx = 63
+def read_message(timeout=3):
+    """Lit un message complet envoyé par l'Arduino avec un timeout."""
+    pattern = r"^<IP=\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}, Method=[A-Za-z0-9]+, Heure=\d{1,2}, Minute=\d{1,2}>$"
+    start_time = time.time()
+    while True:
+        if ser.in_waiting > 0:  # Vérifie si des données sont disponibles
+            message = ser.readline().decode('utf-8', errors='ignore').strip()
+            if re.match(pattern, message):  # Vérifie si le message correspond au format attendu
+                return message
             else:
-                newData = True  # Marqueur de fin atteint
-                recvInProgress = False
-                # Nettoyer la chaîne après réception complète
-                receivedChars = receivedChars.strip('<>')  # Retirer les marqueurs de début et de fin
+                print(f"Message ignoré (format incorrect)")
+        if time.time() - start_time > timeout:  # Vérifie si le timeout est dépassé
+            raise TimeoutError("Aucun message reçu dans le délai imparti.")
 
-        elif rc == startMarker:
-            recvInProgress = True  # Commencer la réception des données
-
-# Fonction pour analyser les données
-def parseData():
-    global messageFromPC, integerFromPC, floatFromPC
-
-    # Diviser la chaîne en parties séparées par une virgule
-    parts = receivedChars.split(',')
-
-    print(f"Parties extraites : {parts}")  # Affiche les parties extraites pour le débogage
-
-    # Assurez-vous que la chaîne contient bien trois parties avant de procéder à l'analyse
-    if len(parts) == 3:
-        messageFromPC = parts[0].strip()  # Extraire et nettoyer la première partie (chaîne)
-        try:
-            integerFromPC = int(parts[1].strip())  # Convertir la deuxième partie en entier
-        except ValueError:
-            integerFromPC = 0  # Valeur par défaut en cas d'erreur de conversion
-        try:
-            floatFromPC = float(parts[2].strip())  # Convertir la troisième partie en flottant
-        except ValueError:
-            floatFromPC = 0.0  # Valeur par défaut en cas d'erreur de conversion
-
-# Fonction pour afficher les données analysées
-def showParsedData():
-    print(f"Message: {messageFromPC}")
-    print(f"Integer: {integerFromPC}")
-    print(f"Float: {floatFromPC}")
-
-# Boucle principale
 while True:
-    ser.write(b"<uwu,12,9>")
-
-    recvWithStartEndMarkers()  # Attendre et recevoir les données
-    if newData:
-        tempChars = receivedChars  # Copier les données reçues
-        print(f"Réception complète: {receivedChars}")  # Affiche les données reçues
-        parseData()  # Analyser les données
-        showParsedData()  # Afficher les résultats
-        newData = False  # Réinitialiser le drapeau newData
-        receivedChars = ""  # Réinitialiser pour la prochaine réception
-    time.sleep(0.1)  # Attendre un peu avant de recommencer
+    try:
+        userinput = int(input("1: écrire un log | 2: lire un log | 3: effacer tous les logs\nVotre choix : "))
+        
+        if userinput == 1:
+            # Saisie des informations pour écrire un log
+            aipinput = int(input("1: Entrez votre IP (premier nombre, par ex 172) : "))
+            bipinput = int(input("2: Entrez votre IP (second nombre, par ex 168) : "))
+            cipinput = int(input("3: Entrez votre IP (troisième nombre, par ex 1) : "))
+            dipinput = int(input("4: Entrez votre IP (quatrième nombre, par ex 1) : "))
+            methodinput = input("5: Entrez la méthode : ")
+            
+            # Envoi de la commande à l'Arduino
+            ser.write(f"<{methodinput},{aipinput},{bipinput},{cipinput},{dipinput},1>".encode('utf-8'))
+            print("Message transmis !")
+        
+        elif userinput == 2:
+            # Lecture d'un log spécifique
+            indexinput = int(input("Entrez l'index du log que vous voulez lire : "))
+            ser.write(f"<read,{indexinput}>".encode('utf-8'))
+            print("En attente de lecture...")
+            
+            # Lecture de la réponse de l'Arduino
+            try:
+                response = read_message()
+                print("Réponse Arduino :", response)
+            except TimeoutError as e:
+                print(e)
+        
+        elif userinput == 3:
+            # Effacement des logs
+            ser.write(f"<clear>".encode('utf-8'))
+            print("Commande d'effacement envoyée.")
+            
+            # Lecture de la confirmation de l'Arduino
+            try:
+                response = read_message()
+                print("Réponse Arduino :", response)
+            except TimeoutError as e:
+                print(e)
+        
+        else:
+            print("Choix invalide. Veuillez entrer 1, 2 ou 3.")
+    
+    except ValueError:
+        print("Erreur : Veuillez entrer un nombre valide.")
+    except serial.SerialException as e:
+        print(f"Erreur de communication série : {e}")
+        break

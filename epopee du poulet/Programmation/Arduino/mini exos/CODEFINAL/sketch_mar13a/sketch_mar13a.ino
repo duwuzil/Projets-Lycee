@@ -6,16 +6,17 @@ const byte numChars = 32;
 char receivedChars[numChars];
 char tempChars[numChars];
 char method[10] = {};
-byte ip[4] = { 0, 0, 0, 0 };
+byte ip[4] = {0, 0, 0, 0};
 byte minu = 0;
 byte heu = 0;
 char newmethod[10] = {};
-char invertmethod[10] = {};
-byte newip[4] = { 0, 0, 0, 0 };
+byte newip[4] = {0, 0, 0, 0};
 byte newminu = 0;
 byte newheu = 0;
-int code = 0;
+int code = 0; // 1 = écriture, 2 = lecture dernière, 3 = reset, 4 = lecture d'un enregistrement spécifique
 boolean newData = false;
+
+int recordToRead = 0;
 
 tmElements_t tm;
 
@@ -27,14 +28,14 @@ tmElements_t tm;
 bool longMode = EEPROM_93C46_MODE_8BIT;
 int add = 0;
 int newadd = 0;
+int alladd[128] = {0};
+int iter = 0;
 eeprom_93C46 e = eeprom_93C46(pCS, pSK, pDI, pDO);
-
 
 void setup() {
   e.set_mode(longMode);
   Serial.begin(9600);
-
-  Serial.println("programme final en lancement");
+  Serial.println("Programme Arduino prêt");
   delay(200);
 }
 
@@ -43,90 +44,111 @@ void loop() {
     minu = tm.Minute;
     heu = tm.Hour;
   }
+
   recvWithStartEndMarkers();
-  if (newData == true) {
+  if (newData) {
     strcpy(tempChars, receivedChars);
     parseData();
     newData = false;
   }
 
-  if (code == 1) {
+  if (code == 1) { // Écriture d'un enregistrement
     showParsedData();
     e.ew_enable();
 
-
-    e.write(add, ip[0]);
-    add += sizeof(ip[0]);
-    e.write(add, ip[1]);
-    add += sizeof(ip[1]);
-    e.write(add, ip[2]);
-    add += sizeof(ip[2]);
-    e.write(add, ip[3]);
-    add += sizeof(ip[3]);
-    for (int i = 0; i < String(method).length(); i++) {
-      e.write(add + i, method[i]);
+    for (int i = 0; i < 4; i++) {
+      e.write(add, ip[i]);
+      add += sizeof(ip[i]);
     }
-    add += String(method).length();
+
+    int methodLen = strlen(method);
+    for (int i = 0; i < methodLen; i++) {
+      e.write(add, method[i]);
+      add += sizeof(method[i]);
+    }
 
     e.write(add, heu);
     add += sizeof(heu);
-
     e.write(add, minu);
     add += sizeof(minu);
 
-    e.write(add, "\0");
+    e.write(add, methodLen);
+    alladd[iter] = add;
+    iter++;
+    add += sizeof(byte);
 
-    Serial.println(add);
-    newadd = add;
-
-    // Optionally, disable EW after writing
     e.ew_disable();
-
-    delay(100);
+    Serial.println("Enregistrement terminé");
     code = 0;
   }
-  if (code == 2) {
-    newadd -= 1;
 
-    newminu = e.read(newadd);
-    newadd -= sizeof(newminu);
-
-    newheu = e.read(newadd);
-    newadd -= sizeof(newheu);
-
-
-    for (int i = String(method).length() - 1; i >= 0; i--) {
-      newmethod[i] = e.read(newadd);   // Lire chaque caractère
-      newadd -= sizeof(newmethod[i]);  // Décrémenter l'adresse après chaque lecture
+  if (code == 2) { // Lecture de l'enregistrement le plus récent
+    if (iter <= 0) {
+      Serial.println("Aucun enregistrement disponible");
+      code = 0;
+      return;
     }
-
-
-
-
-    newip[3] = e.read(newadd);
-    newadd -= sizeof(newip[3]);
-    newip[2] = e.read(newadd);
-    newadd -= sizeof(newip[2]);
-    newip[1] = e.read(newadd);
-    newadd -= sizeof(newip[1]);
-    newip[0] = e.read(newadd);
-    newadd -= sizeof(newip[0]);
-
-    Serial.println(newip[0]);
-    Serial.println(newip[1]);
-    Serial.println(newip[2]);
-    Serial.println(newip[3]);
-    Serial.println(newmethod);
-    Serial.println(newheu);
-    Serial.println(newminu);
+    newadd = alladd[iter - 1];
+    readRecord();
     code = 0;
   }
-  if (code == 3) {
+
+  if (code == 4) { // Lecture d'un enregistrement spécifique
+    if (recordToRead < 0 || recordToRead >= iter) {
+      Serial.println("Enregistrement non disponible");
+      code = 0;
+      return;
+    }
+    newadd = alladd[recordToRead];
+    readRecord();
+    code = 0;
+  }
+
+  if (code == 3) { // Réinitialisation
     add = 0;
+    iter = 0;
+    for (int i = 0; i < 128; i++) {
+      alladd[i] = 0;
+    }
     resetep();
-    delay(100);
+    Serial.println("Logs effacés");
     code = 0;
   }
+}
+
+void readRecord() {
+  int len = e.read(newadd);
+  newadd -= sizeof(byte);
+
+  newminu = e.read(newadd);
+  newadd -= sizeof(byte);
+
+  newheu = e.read(newadd);
+  newadd -= sizeof(byte);
+
+  for (int i = len - 1; i >= 0; i--) {
+    newmethod[i] = e.read(newadd);
+    newadd -= sizeof(char);
+  }
+  newmethod[len] = '\0';
+
+  for (int i = 3; i >= 0; i--) {
+    newip[i] = e.read(newadd);
+    newadd -= sizeof(byte);
+  }
+
+  Serial.print("<IP=");
+  Serial.print(newip[0]); Serial.print(".");
+  Serial.print(newip[1]); Serial.print(".");
+  Serial.print(newip[2]); Serial.print(".");
+  Serial.print(newip[3]);
+  Serial.print(", Method=");
+  Serial.print(newmethod);
+  Serial.print(", Heure=");
+  Serial.print(newheu);
+  Serial.print(", Minute=");
+  Serial.print(newminu);
+  Serial.println(">");
 }
 
 void recvWithStartEndMarkers() {
@@ -136,10 +158,9 @@ void recvWithStartEndMarkers() {
   char endMarker = '>';
   char rc;
 
-  while (Serial.available() > 0 && newData == false) {
+  while (Serial.available() > 0 && !newData) {
     rc = Serial.read();
-
-    if (recvInProgress == true) {
+    if (recvInProgress) {
       if (rc != endMarker) {
         receivedChars[ndx] = rc;
         ndx++;
@@ -152,26 +173,29 @@ void recvWithStartEndMarkers() {
         ndx = 0;
         newData = true;
       }
-    }
-
-    else if (rc == startMarker) {
+    } else if (rc == startMarker) {
       recvInProgress = true;
     }
   }
 }
 
 void parseData() {
-  char* strtokIndx;
-  strtokIndx = strtok(tempChars, ",");
-  strcpy(method, strtokIndx);
-
-  strtokIndx = strtok(NULL, ",");
-  for (int i = 0; i < 4; i++) {
-    ip[i] = atoi(strtokIndx);
-    strtokIndx = strtok(NULL, ",");
+  char* token = strtok(tempChars, ",");
+  if (strcmp(token, "read") == 0) {
+    token = strtok(NULL, ",");
+    recordToRead = atoi(token);
+    code = 4;
+  } else if (strcmp(token, "clear") == 0) {
+    code = 3;
+  } else {
+    strcpy(method, token);
+    for (int i = 0; i < 4; i++) {
+      token = strtok(NULL, ",");
+      ip[i] = atoi(token);
+    }
+    token = strtok(NULL, ",");
+    code = atoi(token);
   }
-
-  code = atoi(strtokIndx);
 }
 
 void resetep() {
@@ -181,8 +205,12 @@ void resetep() {
 }
 
 void showParsedData() {
+  Serial.print("Method=");
   Serial.print(method);
+  Serial.print(", IP=");
   for (int i = 0; i < 4; i++) {
-    Serial.println(ip[i]);
+    Serial.print(ip[i]);
+    if (i < 3) Serial.print(".");
   }
+  Serial.println("");
 }
